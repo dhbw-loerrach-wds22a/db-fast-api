@@ -21,11 +21,9 @@ app.add_middleware(
 )
 @app.get("/reviews/{business_id}")
 async def get_reviews(business_id: str):
-    start_time = time.time()  # Zeitmessung starten
     update_and_check_reviews_rating(business_id)
     redis_con = get_redis_connection()
     value = redis_con.get(business_id)
-
     if value is not None:
         return json.loads(value)
     db = get_mongo_db()
