@@ -33,7 +33,7 @@ def update_and_check_reviews_rating(business_id: str):
 
             # Publish a message
 
-            message = 'Your rating for the past 5 reviews fell bellow 2 (' + avg_stars + ')'
+            message = 'Your rating for the past 5 reviews fell bellow 2 (' + str(avg_stars) + ')'
             redis_client.publish(business_id, message)
             print(f"[{business_id}]: {message}")
     else:

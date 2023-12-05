@@ -3,7 +3,7 @@ import json
 from pymongo import MongoClient
 import mysql.connector
 import redis
-REDIS_CACHE_TIME = 12000 # seconds
+REDIS_CACHE_TIME = None # seconds
 def get_mongo_db():
     client = MongoClient('mongodb', 27017)
     db = client.yelp_data

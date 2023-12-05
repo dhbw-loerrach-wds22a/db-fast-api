@@ -26,17 +26,11 @@ async def get_reviews(business_id: str):
     redis_con = get_redis_connection()
     value = redis_con.get(business_id)
 
-    end_time = time.time()  # Zeitmessung beenden
-    execution_time = end_time - start_time  # Berechnung der Ausführungszeit
-    print(f"Ausführungszeit(after redis.get): {execution_time} Sekunden")
     if value is not None:
         return json.loads(value)
     db = get_mongo_db()
     reviews = db.reviews.find({"business_id": business_id}, {"_id": 0})
     ret_reviews = list(reviews)
-    end_time = time.time()  # Zeitmessung beenden
-    execution_time = end_time - start_time  # Berechnung der Ausführungszeit
-    print(f"Ausführungszeit(after for loop): {execution_time} Sekunden")
     redis_con.set(business_id, json.dumps(ret_reviews), ex=REDIS_CACHE_TIME)
     redis_con.close()
     return ret_reviews

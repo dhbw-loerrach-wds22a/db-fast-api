@@ -1,6 +1,6 @@
 import redis
 
-from db import *
+from db_local import *
 def message_handler(message):
     print(f"Received: {message['data']}")
 
@@ -8,7 +8,7 @@ def message_handler(message):
 redis_client = get_redis_connection()
 
 # Subscribe to the channel
-channel = 'test_channel'
+channel = '_5k9hs8ae9S9Dj46EZrSAg'
 pubsub = redis_client.pubsub()
 pubsub.subscribe(**{channel: message_handler})
 
