@@ -23,7 +23,7 @@ This FastAPI application provides an interface for managing and retrieving busin
 ### Manage Reviews
 - `POST /review/add`: Add a new review.
 - `GET /review/del/{review_id}`: Delete a review by its ID.
-- `GET /review/del-augmented`: Delete all reviews added by the user 'augmented'.
+- `GET /review/del-augmented`: Delete all reviews added manually (marked with the user_id 'augmented').
 
 ### Run the pubsub_demo
 - set the channel to the listening business_id: `channel = '_5k9hs8ae9S9Dj46EZrSAg'`
