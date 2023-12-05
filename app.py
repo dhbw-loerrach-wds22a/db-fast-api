@@ -1,0 +1,100 @@
+import json
+
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+from db import *
+from util import *
+from controller import *
+
+
+app = FastAPI()
+
+
+@app.get("/reviews/{business_id}")
+async def get_reviews(business_id: str):
+    redis_con = get_redis_connection()
+    value = redis_con.get(business_id)
+    if value is not None:
+        return json.loads(value)
+    db = get_mongo_db()
+    reviews = db.reviews.find({"business_id": business_id})
+    ret_reviews = []
+    for review in reviews:
+        review['_id'] = str(review['_id'])
+        ret_reviews.append(review)
+    redis_con.set(business_id, json.dumps(ret_reviews), ex=REDIS_CACHE_TIME)
+    redis_con.close()
+    return ret_reviews
+
+
+@app.get("/business/{name}")
+async def get_business(name: str):
+    redis_con = get_redis_connection()
+    value = redis_con.get(name)
+    if value is not None:
+        return json.loads(value)
+    connection = get_mysql_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM business WHERE name = %s", (name,))
+    businesses = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    redis_con.set(name, json.dumps(businesses), ex=REDIS_CACHE_TIME)
+    return businesses
+
+
+class ReviewDocument(BaseModel):
+    business_id: str = Field(..., description="The ID of the business being reviewed", example="abc123")
+    review_id: str = Field(None, description="The ID of the review")
+    user_id: str = Field(None, description="The ID of the user who wrote the review")
+    stars: float = Field(..., description="The star rating of the review", example=4.5)
+    useful: int = Field(None, description="The number of users who found the review useful")
+    funny: int = Field(None, description="The number of users who found the review funny")
+    cool: int = Field(None, description="The number of users who found the review cool")
+    text: str = Field(..., description="The review text", example="This is a great place!")
+    date: str = Field(None, description="The Date", example="This is a great place!")
+
+
+@app.post("/review/add")
+async def add_review_to_redis(review: ReviewDocument):
+    review.review_id = generate_random_sequence()
+    review.user_id = "augmented"
+    review.useful = 0
+    review.funny = 0
+    review.cool = 0
+    review.date = get_today()
+    db = get_mongo_db()
+    db.reviews.insert_one(review.dict())
+    update_review_cache(review.business_id)
+    update_recent_reviews_rating(review.business_id)
+    #add check for last_x reviews
+    return ({"message": "Review added to Redis", "review_id": review.review_id})
+
+@app.get("/review/del/{review_id}")
+async def del_review(review_id: str):
+    filter_query = {"review_id": review_id}
+    db = get_mongo_db()
+    cursor = db.reviews.find(filter_query)
+    business_ids_to_delete = [doc["business_id"] for doc in cursor]
+    result = db.reviews.delete_many(filter_query)
+    for business_id in business_ids_to_delete:
+        update_review_cache(business_id)
+    return {"message": "Review deleted to Redis", "review_id": review_id}
+
+
+@app.get("/review/del-augmented")
+async def delete_augmented():
+    filter_query = {"user_id": "augmented"}
+    db = get_mongo_db()
+    cursor = db.reviews.find(filter_query)
+    business_ids_to_delete = [doc["business_id"] for doc in cursor]
+    result = db.reviews.delete_many(filter_query)
+    for business_id in business_ids_to_delete:
+        update_review_cache(business_id)
+    # Check the result and return a message
+    if result.deleted_count > 0:
+        return {"message": f"{result.deleted_count} documents deleted"}
+    else:
+        return {"message": "No documents matching the filter"}
+
