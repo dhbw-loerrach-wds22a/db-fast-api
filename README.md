@@ -1,5 +1,5 @@
 # Business Reviews API
-
+# See services repository for setup instructions
 ## Description
 This FastAPI application provides an interface for managing and retrieving business reviews. It supports operations such as fetching reviews for a specific business, retrieving business details, adding new reviews, and deleting reviews.
 
