@@ -1,7 +1,7 @@
 import pymongo
 
 from db import *
-
+from bson.son import SON
 
 def update_review_cache(business_id: str):
     redis_con = get_redis_connection()
@@ -18,9 +18,9 @@ def update_review_cache(business_id: str):
     redis_con.close()
 
 
-def update_recent_reviews_rating(business_id: str):
-    redis_con = get_redis_connection()
+def update_and_check_reviews_rating(business_id: str):
     db = get_mongo_db()
+    last_5_reviews = db.reviews.find({"business_id": business_id}).sort("date", pymongo.DESCENDING).limit(5)
     # Extract the "stars" values into a list
     stars_list = [x['stars'] for x in last_5_reviews]
 
@@ -28,5 +28,28 @@ def update_recent_reviews_rating(business_id: str):
     if stars_list:
         avg_stars = sum(stars_list) / len(stars_list)
         print(f"Average Stars: {avg_stars}")
+        if (avg_stars < 2):
+            print(f"NOTIFY HERE: {avg_stars}")
     else:
         print("No reviews found.")
+
+
+async def startup_function():
+    # db = get_mongo_db()
+    # # Aggregation pipeline
+    # pipeline = [
+    #     {"$sort": SON([("date", -1)])},  # Sort by date in descending order
+    #     {"$group": {
+    #         "_id": "$business_id",  # Group by business_id
+    #         "documents": {"$push": "$$ROOT"}  # Push all documents for each business_id
+    #     }},
+    #     {"$project": {
+    #         "documents": {"$slice": ["$documents", 5]}  # Limit to latest 5 documents
+    #     }}
+    # ]
+    # # Execute the aggregation query
+    # latest_documents_per_business = list(db.reviews.aggregate(pipeline, allowDiskUse=True))
+    # print(latest_documents_per_business)
+
+    print("Running startup function")
+    # Place your startup code here

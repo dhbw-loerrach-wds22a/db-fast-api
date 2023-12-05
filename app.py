@@ -1,5 +1,3 @@
-import json
-
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
@@ -10,9 +8,13 @@ from controller import *
 
 app = FastAPI()
 
+@app.on_event("startup")
+async def on_startup():
+    await startup_function()
 
 @app.get("/reviews/{business_id}")
 async def get_reviews(business_id: str):
+    update_and_check_reviews_rating(business_id)
     redis_con = get_redis_connection()
     value = redis_con.get(business_id)
     if value is not None:
@@ -67,9 +69,8 @@ async def add_review_to_redis(review: ReviewDocument):
     db = get_mongo_db()
     db.reviews.insert_one(review.dict())
     update_review_cache(review.business_id)
-    update_recent_reviews_rating(review.business_id)
-    #add check for last_x reviews
-    return ({"message": "Review added to Redis", "review_id": review.review_id})
+    update_and_check_reviews_rating(review.business_id)
+    return ({"message": "Review added to MongoDB", "review_id": review.review_id})
 
 @app.get("/review/del/{review_id}")
 async def del_review(review_id: str):
@@ -80,6 +81,7 @@ async def del_review(review_id: str):
     result = db.reviews.delete_many(filter_query)
     for business_id in business_ids_to_delete:
         update_review_cache(business_id)
+        update_and_check_reviews_rating(business_id)
     return {"message": "Review deleted to Redis", "review_id": review_id}
 
 
@@ -91,6 +93,7 @@ async def delete_augmented():
     business_ids_to_delete = [doc["business_id"] for doc in cursor]
     result = db.reviews.delete_many(filter_query)
     for business_id in business_ids_to_delete:
+        update_and_check_reviews_rating(business_id)
         update_review_cache(business_id)
     # Check the result and return a message
     if result.deleted_count > 0:
