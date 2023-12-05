@@ -1,6 +1,9 @@
+import json
+
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
+import time
 
 from db import *
 from util import *
@@ -16,24 +19,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def on_startup():
-    await startup_function()
-
 @app.get("/reviews/{business_id}")
 async def get_reviews(business_id: str):
+    start_time = time.time()  # Zeitmessung starten
     update_and_check_reviews_rating(business_id)
     redis_con = get_redis_connection()
     value = redis_con.get(business_id)
+
+    end_time = time.time()  # Zeitmessung beenden
+    execution_time = end_time - start_time  # Berechnung der Ausführungszeit
+    print(f"Ausführungszeit(after redis.get): {execution_time} Sekunden")
     if value is not None:
         return json.loads(value)
     db = get_mongo_db()
-    reviews = db.reviews.find({"business_id": business_id})
-    ret_reviews = []
-    for review in reviews:
-        review['_id'] = str(review['_id'])
-        ret_reviews.append(review)
+    reviews = db.reviews.find({"business_id": business_id}, {"_id": 0})
+    ret_reviews = list(reviews)
+    end_time = time.time()  # Zeitmessung beenden
+    execution_time = end_time - start_time  # Berechnung der Ausführungszeit
+    print(f"Ausführungszeit(after for loop): {execution_time} Sekunden")
     redis_con.set(business_id, json.dumps(ret_reviews), ex=REDIS_CACHE_TIME)
     redis_con.close()
     return ret_reviews
@@ -53,6 +56,16 @@ async def get_business(name: str):
     connection.close()
     redis_con.set(name, json.dumps(businesses), ex=REDIS_CACHE_TIME)
     return businesses
+
+@app.get("/business_id/{business_id}")
+async def get_business_by_id(business_id: str):
+    connection = get_mysql_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM business WHERE business_id = %s", (business_id,))
+    business = cursor.fetchone()
+    cursor.close()
+    connection.close()
+    return business
 
 
 class ReviewDocument(BaseModel):
